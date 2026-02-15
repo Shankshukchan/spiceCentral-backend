@@ -25,6 +25,12 @@ app.use(`/${uploadsDirName}`, express.static(uploadsDir));
 // Routes
 const menuRouter = require("./routes/menu");
 const ordersRouter = require("./routes/orders");
+const db = require("./db");
+
+app.get("/health", (req, res) => {
+  const connected = db.isConnected ? db.isConnected() : false;
+  res.json({ ok: true, dbConnected: !!connected });
+});
 
 app.use("/api/menu", menuRouter);
 app.use("/api/orders", ordersRouter);

@@ -5,6 +5,10 @@ const Order = require("../models/Order");
 // List all orders
 router.get("/", async (req, res) => {
   try {
+    const db = require("../db");
+    if (!db.isConnected || !db.isConnected()) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const orders = await Order.find().lean();
     res.json(orders);
   } catch (err) {
@@ -15,6 +19,10 @@ router.get("/", async (req, res) => {
 // Create an order
 router.post("/", async (req, res) => {
   try {
+    const db = require("../db");
+    if (!db.isConnected || !db.isConnected()) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const order = new Order(req.body);
     await order.save();
     res.status(201).json(order);
