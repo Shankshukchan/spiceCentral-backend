@@ -29,7 +29,12 @@ const db = require("./db");
 
 app.get("/health", (req, res) => {
   const connected = db.isConnected ? db.isConnected() : false;
-  res.json({ ok: true, dbConnected: !!connected });
+  const lastError = db.getLastError ? db.getLastError() : null;
+  res.json({
+    ok: true,
+    dbConnected: !!connected,
+    lastError: lastError || null,
+  });
 });
 
 app.use("/api/menu", menuRouter);

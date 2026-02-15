@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 let _connected = false;
+let _lastError = null;
 
 const connect = async () => {
   const mongoUri =
@@ -18,10 +19,8 @@ const connect = async () => {
     }
   } catch (err) {
     _connected = false;
-    console.error(
-      "Database connection failed:",
-      err && err.message ? err.message : err,
-    );
+    _lastError = err && err.message ? err.message : err;
+    console.error("Database connection failed:", _lastError);
   }
 };
 
@@ -35,5 +34,8 @@ const isConnected = () => {
   }
 };
 
+const getLastError = () => _lastError;
+
 module.exports = connect;
 module.exports.isConnected = isConnected;
+module.exports.getLastError = getLastError;
