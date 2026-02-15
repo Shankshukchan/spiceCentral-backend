@@ -23,11 +23,32 @@ router.post("/", async (req, res) => {
     if (!db.isConnected || !db.isConnected()) {
       return res.status(503).json({ error: "Database not connected" });
     }
-    const order = new Order(req.body);
+    const body = { ...(req.body || {}) };
+
+    // If client sent 'address' but not 'roomNumber', use it as roomNumber
+    if (!body.roomNumber && body.address) body.roomNumber = body.address;
+
+    // Validate required fields
+    if (!body.roomNumber || String(body.roomNumber).trim() === "") {
+      return res.status(400).json({ error: "roomNumber is required" });
+    }
+
+    // Validate phone as Indian number
+    const phone = (body.phone || "").toString().replace(/\s+/g, "");
+    const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ error: "Invalid Indian phone number" });
+    }
+
+    body.phone = phone;
+
+    const order = new Order(body);
     await order.save();
     res.status(201).json(order);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res
+      .status(400)
+      .json({ error: err && err.message ? err.message : String(err) });
   }
 });
 
