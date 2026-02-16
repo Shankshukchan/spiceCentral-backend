@@ -19,23 +19,12 @@ if (process.env.CLOUDINARY_URL) {
 
 const uploadsDirName = process.env.UPLOADS_DIR || "uploads";
 
-// Use memory storage if Cloudinary is configured so we can upload buffers
-const storage =
-  process.env.CLOUDINARY_URL || process.env.CLOUDINARY_API_KEY
-    ? multer.memoryStorage()
-    : multer.diskStorage({
-        destination: function (req, file, cb) {
-          cb(null, path.join(__dirname, "..", uploadsDirName));
-        },
-        filename: function (req, file, cb) {
-          const uniqueSuffix =
-            Date.now() + "-" + Math.round(Math.random() * 1e9);
-          const ext = path.extname(file.originalname);
-          cb(null, file.fieldname + "-" + uniqueSuffix + ext);
-        },
-      });
-
+// Always use memory storage: we require Cloudinary for durable uploads on deployed servers.
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
+const cloudConfigured = !!(
+  process.env.CLOUDINARY_URL || process.env.CLOUDINARY_API_KEY
+);
 
 // Get all menu items
 router.get("/", async (req, res) => {
@@ -54,34 +43,38 @@ router.post("/", upload.single("image"), async (req, res) => {
     console.log("[menu POST] body:", body);
     console.log("[menu POST] file:", req.file);
     if (req.file) {
-      if (storage === multer.memoryStorage()) {
-        // Upload to Cloudinary from buffer
-        try {
-          const uploadRes = await new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-              { folder: process.env.CLOUDINARY_FOLDER || "spicecentral" },
-              (error, result) => {
-                if (error) return reject(error);
-                resolve(result);
-              },
-            );
-            stream.end(req.file.buffer);
-          });
-          // Use cloudinary secure_url
-          body.image = uploadRes.secure_url || uploadRes.url;
-          // attach cloudinary public_id so we can cleanup on failure and persist it
-          req._cloudinary_public_id = uploadRes.public_id;
-          body.imagePublicId = uploadRes.public_id;
-        } catch (e) {
-          console.error(
-            "Cloudinary upload failed:",
-            e && e.message ? e.message : e,
+      // We only support Cloudinary-backed uploads. If Cloudinary isn't configured,
+      // reject the file upload to avoid storing files on disk (ephemeral on many hosts).
+      if (!cloudConfigured) {
+        return res.status(500).json({
+          error:
+            "Cloudinary is not configured on the server; file uploads are disabled. Please set CLOUDINARY_URL or CLOUDINARY_* env vars.",
+        });
+      }
+
+      // Upload to Cloudinary from buffer
+      try {
+        const uploadRes = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: process.env.CLOUDINARY_FOLDER || "spicecentral" },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            },
           );
-          return res.status(500).json({ error: "Image upload failed" });
-        }
-      } else {
-        // store the public path to the uploaded file
-        body.image = `/${uploadsDirName}/${req.file.filename}`;
+          stream.end(req.file.buffer);
+        });
+        // Use cloudinary secure_url
+        body.image = uploadRes.secure_url || uploadRes.url;
+        // attach cloudinary public_id so we can cleanup on failure and persist it
+        req._cloudinary_public_id = uploadRes.public_id;
+        body.imagePublicId = uploadRes.public_id;
+      } catch (e) {
+        console.error(
+          "Cloudinary upload failed:",
+          e && e.message ? e.message : e,
+        );
+        return res.status(500).json({ error: "Image upload failed" });
       }
     }
     // ensure id exists
