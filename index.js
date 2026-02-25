@@ -2,6 +2,8 @@ const express = require("express");
 const connect = require("./db.js");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const cron = require("node-cron");
+const http = require("http");
 
 // Load environment variables from .env if present
 dotenv.config();
@@ -44,3 +46,20 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`server running at port ${PORT}`);
 });
+
+// Keep server alive on Render - ping self every 15 minutes
+if (process.env.NODE_ENV !== "development") {
+  cron.schedule("*/15 * * * *", () => {
+    const apiUrl = process.env.API_URL;
+    http
+      .get(`${apiUrl}/health`, (res) => {
+        console.log(
+          `Health check at ${new Date().toISOString()}: ${res.statusCode}`,
+        );
+      })
+      .on("error", (err) => {
+        console.error(`Health check error: ${err.message}`);
+      });
+  });
+  console.log("Cron job scheduled to keep server alive every 15 minutes");
+}
