@@ -49,7 +49,7 @@ app.listen(PORT, () => {
 
 // Keep server alive on Render - ping self every 15 minutes
 if (process.env.NODE_ENV !== "development") {
-  cron.schedule("*/15 * * * *", () => {
+  cron.schedule("*/10 * * * *", () => {
     const apiUrl = process.env.API_URL;
     http
       .get(`${apiUrl}/health`, (res) => {
@@ -61,5 +61,5 @@ if (process.env.NODE_ENV !== "development") {
         console.error(`Health check error: ${err.message}`);
       });
   });
-  console.log("Cron job scheduled to keep server alive every 15 minutes");
+  console.log("Cron job scheduled to keep server alive every 10 minutes");
 }
